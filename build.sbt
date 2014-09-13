@@ -87,7 +87,8 @@ libraryDependencies ++= Seq (
    "org.scalaz" %% "scalaz-core" % "7.0.6",
    "org.scalaz" %% "scalaz-effect" % "7.0.6",
    "org.scalaz.stream" %% "scalaz-stream" % "0.4.1",
-   "org.apache.commons" % "commons-csv" % "1.0"
+   "org.apache.commons" % "commons-csv" % "1.0",
+   "commons-io" % "commons-io" % "2.4"
   // -- util --
   // "com.github.nscala-time" %% "nscala-time" % "0.2.0",
   // "org.spire-math" % "spire_2.10.0" % "0.3.0-M7",
@@ -99,7 +100,6 @@ libraryDependencies ++= Seq (
   // "de.sciss" %% "fingertree" % "1.2.+",
   // "com.assembla.scala-incubator" % "graph-core_2.10" % "1.6.0",
   // -- io --
-  // "commons-io" % "commons-io" % "2.4",
   // -- logging & configuration --
   // "com.typesafe" %% "scalalogging-slf4j" % "1.0.0",
   // "ch.qos.logback" % "logback-classic" % "1.0.7" % "provided",
