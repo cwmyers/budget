@@ -1,20 +1,19 @@
 package com.chrisandjo.finance.budget
 
 
-import scalaz._, Scalaz._
+import com.chrisandjo.finance.budget.AppAction._
+import com.chrisandjo.finance.budget.CSV._
+import com.chrisandjo.finance.budget.Report._
+import com.chrisandjo.finance.budget.interpreter.IOInterpreter
+
+import scalaz.Scalaz._
+import scalaz._
 import scalaz.effect._
-import java.io.File
-import org.apache.commons.io._
-import Report._, CSV._
 
 
 object Budget extends SafeApp {
 
-  def lookup(key: String, m: Map[String, String]): AppError[String] = {
-    (m.get(key) orElse m.find {
-      case (store, cat) => key.contains(store)
-    }.map(_._2)).toRightDisjunction(NonEmptyList(UnknownStore(key)))
-  }
+
 
   case class Transaction(date: String, transaction: String, amount: Double)
 
@@ -23,67 +22,37 @@ object Budget extends SafeApp {
 
     val List(budgetFile, masterCardCsv, qtmbCsv, ingDirectCsv, date) = args
 
-    val maybeMappings: AppErrorT[Map[String, String]] = loadMappings
 
-    val maybeBudget: AppErrorT[Map[String, Double]] = loadKeyPairWithNumbers(budgetFile, 0, 1) map (_.toMap)
+    val script = for {
+      mappings <- loadMappings
+      budget <- loadKeyPairWithNumbers(budgetFile, 0, 1) map (_.toMap)
+      masterCard <- loadMasterCardCsv(masterCardCsv)
+      qtmb <- loadQtmbCsv(qtmbCsv)
+      ing <- loadIngDirectCsv(ingDirectCsv)
+      transactions = masterCard |+| qtmb |+| ing
+      buckets <- loadKeyPairWithNumbers(budgetFile, 0, 2) map (_.toMap)
+      detailedReport = detailedBreakDown(transactions, mappings)
+      _ <- writeToFile(s"detailedReport-$date.txt", writeDetailedReport(detailedReport))
+      report <- createReport(mappings, budget, buckets, transactions).lift
+      _ <- writeToFile(s"monthlyBudget-$date.csv",report)
+    } yield ()
 
-    val maybeInput: AppErrorT[List[Transaction]] =
-      (loadMasterCardCsv(masterCardCsv) |+|
-        loadQtmbCsv(qtmbCsv) |+| loadIngDirectCsv(ingDirectCsv)).toList()
-
-    val maybeBuckets: AppErrorT[Map[String, Double]] = loadKeyPairWithNumbers(budgetFile, 0, 2) map (_.toMap)
-
-    val reportOrError: AppErrorT[(AppError[String], Map[String, List[Transaction]])] =
-      (maybeMappings |@| maybeBudget |@| maybeBuckets |@| maybeInput)(createReports)
+    Free.runFC(resolveErrors(script))(IOInterpreter.interpret)
+  }
 
 
-    reportOrError.run.flatMap {
-      case \/-((csvReport, detailedReport)) => {
-        writeToFile(writeDetailedReport(detailedReport), s"detailedReport-$date.txt") |+|
-          csvReport.fold(unknown => IO.putStrLn("Unknown Store!\n" + handleFailures(unknown).mkString("\n")),
-            writeToFile(_, s"monthlyBudget-$date.csv"))
-      }
-      case -\/(l) => IO.putStrLn(handleFailures(l).mkString("\n"))
+  def resolveErrors(script: ScriptOrError[Unit]): Script[Unit] = {
+    script.fold(errors => printFailure(handleFailures(errors)), noAction).flatMap(identity)
+  }
+
+  def handleFailures(l: NonEmptyList[Errors]): String = {
+    l.foldMap {
+      case UnknownStore(store) => s"Unknown store: $store\n"
+      case BadNumber(message) => s"Bad Number: $message\n"
+      case BadKeyPair(m) => s"Bad Key Pair: $m\n"
+      case ErrorWritingFile(e) => s"Error writing file: ${e.getMessage}\n"
+      case FileNotFound(e) => s"File not found: ${e.getMessage}\n"
     }
-
   }
 
-
-
-  def writeToFile(output: String, fileName: String): IO[Unit] = IO {
-    FileUtils.writeStringToFile(new File(fileName), output)
-  }
-
-  def createReports(mappings: Map[String, String], budget: Map[String, Double], buckets: Map[String, Double], rawSpendings: List[Transaction]) = {
-    val maybeCategories = (rawSpendings map {
-      t =>
-        lookup(t.transaction, mappings) map (a => Map(a -> t.amount))
-    }).map(_.validation).sequence[VAppError, Map[String, Double]].disjunction
-
-    val detailedBreakdown = rawSpendings groupBy { t => lookup(t.transaction, mappings).getOrElse("Unknown")}
-
-    val categorizedSpending = ListT[AppError, Map[String, Double]](maybeCategories)
-
-    //    val totSpend = categorizedSpending.suml
-    type y[+A] = ListT[AppError, A]
-    val x = Foldable[List]
-
-//    Foldable.suml(totSpend)
-
-    val csvReport = maybeCategories map { categorySpending =>
-      val totalSpend = categorySpending.suml.mapValues(-_)
-      val newBuckets = buckets |+| budget |+| totalSpend
-      createCsv(newBuckets, totalSpend, budget)
-    }
-
-    (csvReport, detailedBreakdown)
-  }
-
-
-  def handleFailures(l: NonEmptyList[Errors]): List[String] = {
-    val errors: List[Errors] = l.toList
-    errors.collect { case UnknownStore(store) => store}.toSet.toList |+|
-      errors.collect { case BadNumber(message) => s"Bad Number: $message"}.toList |+| errors.collect { case BadKeyPair(m) => s"Bad Key Pair: $m"}.toList
-
-  }
 }

@@ -84,8 +84,8 @@ mainClass in (Compile, run) := Some("com.chrisandjo.finance.budget.Budget")
 libraryDependencies ++= Seq (
   // -- lang --
   // "org.apache.commons" % "commons-lang3" % "3.1",
-   "org.scalaz" %% "scalaz-core" % "7.0.6",
-   "org.scalaz" %% "scalaz-effect" % "7.0.6",
+   "org.scalaz" %% "scalaz-core" % "7.1.2",
+   "org.scalaz" %% "scalaz-effect" % "7.1.2",
    "org.scalaz.stream" %% "scalaz-stream" % "0.4.1",
    "org.apache.commons" % "commons-csv" % "1.0",
    "commons-io" % "commons-io" % "2.4"
