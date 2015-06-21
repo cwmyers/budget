@@ -1,9 +1,10 @@
 package com.chrisandjo.finance.budget
 
-import com.chrisandjo.finance.budget.Budget.Transaction
 import com.chrisandjo.finance.budget.CSV._
+import com.chrisandjo.finance.budget.model._
 
-import scalaz._,Scalaz._
+import scalaz.Scalaz._
+import scalaz._
 
 object Report {
 
@@ -14,22 +15,23 @@ object Report {
     }.mkString("\n\n\n") + "\n\n\n"
   }
 
-  def createReport(mappings: Map[String, String], budget: Map[String, Double], buckets: Map[String, Double], rawSpendings: List[Transaction]):AppError[String] = {
-    val maybeCategories = (rawSpendings map {
-      t =>
-        lookup(t.transaction, mappings) map (a => Map(a -> t.amount))
-    }).map(_.validation).sequence[VAppError, Map[String, Double]].disjunction
-
-
-    maybeCategories map { categorySpending =>
-      val totalSpend = categorySpending.suml.mapValues(-_)
-      val newBuckets = buckets |+| budget |+| totalSpend
-      createCsv(newBuckets, totalSpend, budget)
-    }
+  def createReport(budget: Map[String, Double], buckets: Map[String, Double],
+                   transactions: List[Transaction]): String = {
+    val totalSpend = transactions.map(t => Map(t.category -> t.amount)).suml.mapValues(-_)
+    val newBuckets = buckets |+| budget |+| totalSpend
+    createCsv(newBuckets, totalSpend, budget)
   }
 
-  def detailedBreakDown(transactions: List[Transaction], mappings: Map[String, String]) =
-    transactions groupBy { t => lookup(t.transaction, mappings).getOrElse("Unknown") }
+  def resolveTransactions(mappings: Map[String, String],
+                          rawSpendings: List[ReceivedTransaction]): AppError[List[Transaction]] = {
+    (rawSpendings map {
+      t =>
+        lookup(t.transaction, mappings) map (Transaction.withCategory(t, _))
+    }).map(_.validation).sequence[VAppError, Transaction].disjunction
+  }
+
+  def detailedBreakDown(transactions: List[Transaction]) =
+    transactions groupBy { t => t.category }
 
 
   def lookup(key: String, m: Map[String, String]): AppError[String] = {
@@ -37,7 +39,6 @@ object Report {
       case (store, cat) => key.contains(store)
     }.map(_._2)).toRightDisjunction(NonEmptyList(UnknownStore(key)))
   }
-
 
 
 }

@@ -1,7 +1,7 @@
 package com.chrisandjo.finance.budget
 
 import com.chrisandjo.finance.budget.AppAction.{Script, loadKeyPairs}
-import com.chrisandjo.finance.budget.Budget.Transaction
+import com.chrisandjo.finance.budget.model.ReceivedTransaction
 import org.apache.commons.csv.CSVRecord
 
 import scalaz.Scalaz._
@@ -17,13 +17,13 @@ object CSV {
   def negate[A](a: (A, Double)): (A, Double) =
     a.copy(_2 = -a._2)
 
-  def negate(a: Transaction): Transaction =
+  def negate(a: ReceivedTransaction): ReceivedTransaction =
     a.copy(amount = -a.amount)
 
 
-  def csvRecordToTransaction(dateIndex: Int, descriptionIndex: Int, valueIndex: Int)(r: CSVRecord): AppError[Transaction] = {
+  def csvRecordToTransaction(dateIndex: Int, descriptionIndex: Int, valueIndex: Int)(r: CSVRecord): AppError[ReceivedTransaction] = {
     \/.fromTryCatchNonFatal {
-      Transaction(r.get(dateIndex), r.get(descriptionIndex), r.get(valueIndex).toDouble)
+      ReceivedTransaction(r.get(dateIndex), r.get(descriptionIndex), r.get(valueIndex).toDouble)
     } leftMap (e => NonEmptyList(BadKeyPair(s"$e $r")))
   }
 
@@ -39,31 +39,32 @@ object CSV {
     buckets.toList.filterNot(_._1 == "ignore").foldLeft("") { (acc, e) => acc + s"${e._1}, ${budget.getOrElse(e._1, 0.0)}, ${e._2}, ${-spend.getOrElse(e._1, 0.0)}\n" }
   }
 
+  def parse(n: String): Throwable \/ Double = {
+    n.replace("$", "").replace(",", "").replace("(", "-").replace(")", "").parseDouble.disjunction
+  }
+
   def loadKeyPairWithNumbers(fileName: String, keyIndex: Int, valueIndex: Int): ScriptOrError[List[(String, Double)]] = {
-    def parse(n: String): Option[Double] = {
-      n.replace("$", "").replace(",", "").replace("(", "-").replace(")", "").parseDouble.toOption
-    }
     scriptListFunctor.map(loadKeyPairs(fileName, keyIndex, valueIndex))(a => a.copy(_2 = parse(a._2).getOrElse(0.0)))
   }
 
-  def loadTransactions(fileName: String, keyIndex: Int, valueIndex: Int): ScriptOrError[List[Transaction]] = {
+  def loadTransactions(fileName: String, keyIndex: Int, valueIndex: Int): ScriptOrError[List[ReceivedTransaction]] = {
     scriptListFunctor.map(loadKeyPairWithNumbers(fileName, keyIndex, valueIndex))(pairToTransaction)
   }
 
-  def pairToTransaction(pair: (String, Double)): Transaction = Transaction("", pair._1, pair._2)
+  def pairToTransaction(pair: (String, Double)): ReceivedTransaction = ReceivedTransaction("", pair._1, pair._2)
 
-  def loadMasterCardCsv(fileName: String): ScriptOrError[List[Transaction]] = loadTransactions(fileName, 2, 3)
+  def loadMasterCardCsv(fileName: String): ScriptOrError[List[ReceivedTransaction]] = loadTransactions(fileName, 2, 3)
 
 
-  def loadIngDirectCsv(fileName: String): ScriptOrError[List[Transaction]] = {
+  def loadIngDirectCsv(fileName: String): ScriptOrError[List[ReceivedTransaction]] = {
     scriptListFunctor.map(loadTransactions(fileName, 1, 2))(convertToIng _ andThen negate)
   }
 
   val atmCharge = """^.*ATM owner fee of \$(\d+\.\d{2}).*""".r
 
-  def convertToIng(transaction: Transaction): Transaction = {
+  def convertToIng(transaction: ReceivedTransaction): ReceivedTransaction = {
     transaction match {
-      case Transaction(_, key, value) => key match {
+      case ReceivedTransaction(_, key, value) => key match {
         case atmCharge(amount) => transaction.copy(amount = value + amount.toDouble)
         case _ => transaction
       }
