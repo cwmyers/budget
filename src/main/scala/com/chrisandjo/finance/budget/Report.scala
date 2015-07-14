@@ -23,21 +23,21 @@ object Report {
   }
 
   def resolveTransactions(mappings: Map[String, String],
-                          rawSpendings: List[ReceivedTransaction]): AppError[List[Transaction]] = {
-    (rawSpendings map {
+                          rawSpendings: List[ReceivedTransaction]): List[Transaction] =
+    rawSpendings map {
       t =>
-        lookup(t.transaction, mappings) map (Transaction.withCategory(t, _))
-    }).map(_.validation).sequence[VAppError, Transaction].disjunction
-  }
+        Transaction.withCategory(t, lookup(t.transaction, mappings))
+    }
+
 
   def detailedBreakDown(transactions: List[Transaction]) =
     transactions groupBy { t => t.category }
 
 
-  def lookup(key: String, m: Map[String, String]): AppError[String] = {
+  def lookup(key: String, m: Map[String, String]): String = {
     (m.get(key) orElse m.find {
       case (store, cat) => key.contains(store)
-    }.map(_._2)).toRightDisjunction(NonEmptyList(UnknownStore(key)))
+    }.map(_._2)).getOrElse("unknown")
   }
 
 

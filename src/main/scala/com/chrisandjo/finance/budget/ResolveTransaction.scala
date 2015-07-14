@@ -15,7 +15,7 @@ object ResolveTransaction {
       masterCard <- loadMasterCardCsv(masterCardCsv)
       qtmb <- loadQtmbCsv(qtmbCsv)
       ing <- loadIngDirectCsv(ingDirectCsv)
-      transactions <- resolveTransactions(mappings, masterCard |+| qtmb |+| ing).lift
+      transactions = resolveTransactions(mappings, masterCard |+| qtmb |+| ing)
       sortedTransactions = transactions.sortBy(_.category)
       _ <- writeTransactions(s"transactions-$date", sortedTransactions)
     } yield ()
