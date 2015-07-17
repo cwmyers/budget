@@ -28,13 +28,6 @@ object CSV {
   }
 
 
-  //  def loadTransactions(fileName: String, dateIndex: Int, descriptionIndex: Int, valueIndex: Int): ListAppError[Transaction] = {
-  //    val c = csvRecordToTransaction(dateIndex, descriptionIndex, valueIndex) _
-  //    val t: ListT[IO, AppError[Transaction]] = loadCsvRecords(fileName) map c
-  //    val t1: EitherT[IO, NonEmptyList[Errors], List[Transaction]] = EitherT(t.toList() map (_.sequence[AppError, Transaction]))
-  //  }
-
-
   def createCsv(buckets: Map[String, Double], spend: Map[String, Double], budget: Map[String, Double]) = {
     buckets.toList.filterNot(_._1 == "ignore").foldLeft("") { (acc, e) => acc + s"${e._1}, ${budget.getOrElse(e._1, 0.0)}, ${e._2}, ${-spend.getOrElse(e._1, 0.0)}\n" }
   }
