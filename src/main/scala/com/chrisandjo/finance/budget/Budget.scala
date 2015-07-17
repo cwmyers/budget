@@ -4,11 +4,6 @@ package com.chrisandjo.finance.budget
 import com.chrisandjo.finance.budget.AppAction._
 import com.chrisandjo.finance.budget.CSV._
 import com.chrisandjo.finance.budget.Report._
-import com.chrisandjo.finance.budget.interpreter.IOInterpreter
-
-import scalaz.Scalaz._
-import scalaz._
-import scalaz.effect._
 
 
 object Budget {

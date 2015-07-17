@@ -26,7 +26,7 @@ object Report {
                           rawSpendings: List[ReceivedTransaction]): List[Transaction] =
     rawSpendings map {
       t =>
-        Transaction.withCategory(t, lookup(t.transaction, mappings))
+        Transaction.withCategory(t, lookup(t.description.d, mappings))
     }
 
 
@@ -35,8 +35,9 @@ object Report {
 
 
   def lookup(key: String, m: Map[String, String]): String = {
-    (m.get(key) orElse m.find {
-      case (store, cat) => key.contains(store)
+    val lowerCase = key.toLowerCase
+    (m.get(lowerCase) orElse m.find {
+      case (store, cat) => lowerCase.contains(store)
     }.map(_._2)).getOrElse("unknown")
   }
 

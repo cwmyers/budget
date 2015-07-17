@@ -2,13 +2,13 @@ package com.chrisandjo.finance.budget
 
 
 package object model {
-
-  case class ReceivedTransaction(date: String, transaction: String, amount: Double)
-  case class Transaction(date: String, transaction: String, amount: Double, category: String)
+  case class Description(d: String) extends AnyVal
+  case class ReceivedTransaction(date: String, description: Description, amount: Double)
+  case class Transaction(date: String, description: Description, amount: Double, category: String)
 
   object Transaction {
     def withCategory(r: ReceivedTransaction, category: String) =
-      Transaction(r.date, r.transaction,r.amount, category)
+      Transaction(r.date, r.description,r.amount, category)
   }
 
 

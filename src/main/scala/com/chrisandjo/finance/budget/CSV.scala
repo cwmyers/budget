@@ -1,7 +1,7 @@
 package com.chrisandjo.finance.budget
 
 import com.chrisandjo.finance.budget.AppAction.{Script, loadKeyPairs}
-import com.chrisandjo.finance.budget.model.ReceivedTransaction
+import com.chrisandjo.finance.budget.model.{Description, ReceivedTransaction}
 import org.apache.commons.csv.CSVRecord
 
 import scalaz.Scalaz._
@@ -23,7 +23,7 @@ object CSV {
 
   def csvRecordToTransaction(dateIndex: Int, descriptionIndex: Int, valueIndex: Int)(r: CSVRecord): AppError[ReceivedTransaction] = {
     \/.fromTryCatchNonFatal {
-      ReceivedTransaction(r.get(dateIndex), r.get(descriptionIndex), r.get(valueIndex).toDouble)
+      ReceivedTransaction(r.get(dateIndex), Description(r.get(descriptionIndex)), r.get(valueIndex).toDouble)
     } leftMap (e => NonEmptyList(BadKeyPair(s"$e $r")))
   }
 
@@ -51,28 +51,8 @@ object CSV {
     scriptListFunctor.map(loadKeyPairWithNumbers(fileName, keyIndex, valueIndex))(pairToTransaction)
   }
 
-  def pairToTransaction(pair: (String, Double)): ReceivedTransaction = ReceivedTransaction("", pair._1, pair._2)
+  def pairToTransaction(pair: (String, Double)): ReceivedTransaction = ReceivedTransaction("", Description(pair._1), pair._2)
 
-  def loadMasterCardCsv(fileName: String): ScriptOrError[List[ReceivedTransaction]] = loadTransactions(fileName, 2, 3)
-
-
-  def loadIngDirectCsv(fileName: String): ScriptOrError[List[ReceivedTransaction]] = {
-    scriptListFunctor.map(loadTransactions(fileName, 1, 2))(convertToIng _ andThen negate)
-  }
-
-  val atmCharge = """^.*ATM owner fee of \$(\d+\.\d{2}).*""".r
-
-  def convertToIng(transaction: ReceivedTransaction): ReceivedTransaction = {
-    transaction match {
-      case ReceivedTransaction(_, key, value) => key match {
-        case atmCharge(amount) => transaction.copy(amount = value + amount.toDouble)
-        case _ => transaction
-      }
-    }
-
-  }
-
-  def loadQtmbCsv(fileName: String) = scriptListFunctor.map(loadTransactions(fileName, 2, 1))(negate)
 
   def loadMappings: ScriptOrError[Map[String, String]] = {
     loadKeyPairs("data/Mappings.csv", 0, 1) map (_.toMap.mapValues(_.toLowerCase))
